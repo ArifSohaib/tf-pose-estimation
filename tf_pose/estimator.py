@@ -324,7 +324,7 @@ class TfPoseEstimator:
                 minimum_segment_size=3,
                 is_dynamic_op=True,
                 maximum_cached_engines=int(1e3),
-                use_calibration=True,
+                # use_calibration=True,
             )
 
         self.graph = tf.compat.v1.get_default_graph()
@@ -339,10 +339,12 @@ class TfPoseEstimator:
         self.tensor_heatMat = self.tensor_output[:, :, :, :19]
         self.tensor_pafMat = self.tensor_output[:, :, :, 19:]
         self.upsample_size = tf.compat.v1.placeholder(dtype=tf.int32, shape=(2,), name='upsample_size')
-        self.tensor_heatMat_up = tf.compat.v1.image.resize(self.tensor_output[:, :, :, :19], self.upsample_size,
-                                                      align_corners=False, name='upsample_heatmat')
-        self.tensor_pafMat_up = tf.compat.v1.image.resize(self.tensor_output[:, :, :, 19:], self.upsample_size,
-                                                     align_corners=False, name='upsample_pafmat')
+        self.tensor_heatMat_up = tf.image.resize(self.tensor_output[:, :, :, :19], self.upsample_size, name="upsample_heatmat")
+        self.tensor_pafMat_up = tf.image.resize(self.tensor_output[:, :, :, 19:], self.upsample_size, name="upsample_pafmat")
+        # self.tensor_heatMat_up = tf.compat.v1.image.resize(self.tensor_output[:, :, :, :19], self.upsample_size,
+        #                                              align_corners=False, name='upsample_heatmat')
+        # self.tensor_pafMat_up = tf.compat.v1.image.resize(self.tensor_output[:, :, :, 19:], self.upsample_size,
+        #                                              align_corners=False, name='upsample_pafmat')
         if trt_bool is True:
             smoother = Smoother({'data': self.tensor_heatMat_up}, 25, 3.0, 19)
         else:
@@ -410,6 +412,8 @@ class TfPoseEstimator:
             npimg = np.copy(npimg)
         image_h, image_w = npimg.shape[:2]
         centers = {}
+        pairs = []
+        angles = []
         for human in humans:
             # draw point
             for i in range(common.CocoPart.Background.value):
@@ -420,16 +424,21 @@ class TfPoseEstimator:
                 center = (int(body_part.x * image_w + 0.5), int(body_part.y * image_h + 0.5))
                 centers[i] = center
                 cv2.circle(npimg, center, 3, common.CocoColors[i], thickness=3, lineType=8, shift=0)
-
+            #draw angle
+            for angle_order, angle in enumerate(common.cocoTuples):
+                if angle[0] not in human.body_parts.keys() or angle[1] not in human.body_parts.keys() or angle[2] not in human.body_parts.keys():
+                    continue
+                angles.append((centers[angle[0]],centers[angle[1]],centers[angle[2]]))
             # draw line
             for pair_order, pair in enumerate(common.CocoPairsRender):
                 if pair[0] not in human.body_parts.keys() or pair[1] not in human.body_parts.keys():
                     continue
 
                 # npimg = cv2.line(npimg, centers[pair[0]], centers[pair[1]], common.CocoColors[pair_order], 3)
+                pairs.append((centers[pair[0]],centers[pair[1]]))
                 cv2.line(npimg, centers[pair[0]], centers[pair[1]], common.CocoColors[pair_order], 3)
 
-        return npimg
+        return npimg, pairs, angles
 
     def _get_scaled_img(self, npimg, scale):
         get_base_scale = lambda s, w, h: max(self.target_size[0] / float(h), self.target_size[1] / float(w)) * s
