@@ -100,7 +100,7 @@ if __name__ == '__main__':
             thetas = []
             for tup in angles:
                 "angles contain tuple of 3 with x,y values in it"
-                if ((tup[1][0]-tup[0][0])) != 0 and tup[2][0]-tup[1][0] != 0:
+                if ((tup[1][0]-tup[0][0]) != 0) and ((tup[2][0]-tup[1][0]) != 0):
 
                     slope1 = (tup[1][1]-tup[0][1])/(tup[1][0]-tup[0][0])
                     slope2 = (tup[2][1]-tup[1][1])/(tup[2][0]-tup[1][0])
